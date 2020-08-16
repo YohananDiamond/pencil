@@ -14,6 +14,8 @@ use penrose::contrib::layouts::paper;
 use simplelog::{LevelFilter, SimpleLogger};
 use std::process::Command;
 
+mod layouts;
+
 // An example of a simple custom hook. In this case we are creating a NewClientHook which will
 // be run each time a new client program is spawned.
 struct MyClientHook {}
