@@ -16,9 +16,11 @@ pub fn really_cool_layout(
             .map(|c| {
                 let cid = c.id();
                 if cid == fid {
+                    // Focused window - make it occupy the entire layout region
                     (cid, Region::new(mx, my, mw, mh))
                 } else {
-                    (cid, Region::new(mx, my, 0, 0))
+                    // Unfocused window - hide it (not working)
+                    (cid, Region::new(mx, my, 1, 1))
                 }
             })
             .collect()
