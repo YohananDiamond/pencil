@@ -15,7 +15,10 @@ use simplelog::{LevelFilter, SimpleLogger};
 mod layouts;
 mod misc;
 
-fn main() {
+use penrose::draw::*;
+use std::{thread, time};
+
+fn main() -> penrose::Result<()> {
     // penrose will log useful information about the current state of the WindowManager during
     // normal operation that can be used to drive scripts and related programs. Additional debug
     // output can be helpful if you are hitting issues.
@@ -133,8 +136,60 @@ fn main() {
     // external processes such as a start-up script.
     let mut wm = WindowManager::init(config, &conn);
 
+    // Start the bar
+    thread::spawn(start_bar);
+
     // grab_keys_and_run will start listening to events from the X server and drop into the main
     // event loop. From this point on, program control passes to the WindowManager so make sure
     // that any logic you wish to run is done before here!
     wm.grab_keys_and_run(key_bindings);
+
+    Ok(())
+}
+
+const HEIGHT: usize = 18;
+
+const BLACK: u32 = 0x282828;
+const GREY: u32 = 0x3c3836;
+const WHITE: u32 = 0xebdbb2;
+const PURPLE: u32 = 0xb16286;
+const BLUE: u32 = 0x458588;
+const RED: u32 = 0xcc241d;
+
+fn start_bar() -> penrose::Result<()> {
+    let workspaces = &["1", "2", "3", "4", "5", "6"];
+    let style = TextStyle {
+        font: "JetBrains Mono Medium".to_string(),
+        point_size: 11,
+        fg: WHITE.into(),
+        bg: Some(BLACK.into()),
+        padding: (2.0, 2.0),
+    };
+    let highlight = BLUE;
+    let empty_ws = GREY;
+    let mut bar = dwm_bar(
+        Box::new(XCBDraw::new()?),
+        0,
+        HEIGHT,
+        &style,
+        highlight,
+        empty_ws,
+        workspaces,
+    )?;
+
+    let config = Config::default();
+    let conn = XcbConnection::new().unwrap();
+    let mut wm = WindowManager::init(config, &conn);
+
+    thread::sleep(time::Duration::from_millis(1000));
+    for focused in 1..6 {
+        bar.workspace_change(&mut wm, focused - 1, focused);
+        bar.event_handled(&mut wm);
+        thread::sleep(time::Duration::from_millis(1000));
+    }
+
+    // lmao
+    thread::sleep(time::Duration::from_millis(99999999999999999));
+
+    Ok(())
 }
