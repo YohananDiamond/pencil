@@ -1,8 +1,10 @@
-build:
+.PHONY: output install check
+
+output:
 	cargo build --release
 
-install: build
+install: output
 	cp ./target/release/penrose-main ~/.local/bin/penrose
 
 check:
-	cargo check
+	cargo check --release

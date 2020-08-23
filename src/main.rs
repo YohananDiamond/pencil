@@ -2,9 +2,8 @@
 extern crate penrose;
 
 use penrose::client::Client;
-use penrose::data_types::ColorScheme;
 use penrose::hooks::Hook;
-use penrose::layout::{bottom_stack, side_stack, Layout, LayoutConf};
+use penrose::layout::{monocle, bottom_stack, side_stack, Layout, LayoutConf};
 use penrose::{Backward, Config, Forward, Less, More, WindowManager, XcbConnection};
 
 use penrose::contrib::extensions::Scratchpad;
@@ -12,48 +11,9 @@ use penrose::contrib::hooks::{DefaultWorkspace, LayoutSymbolAsRootName};
 use penrose::contrib::layouts::paper;
 
 use simplelog::{LevelFilter, SimpleLogger};
-use std::process::Command;
 
 mod layouts;
-
-// An example of a simple custom hook. In this case we are creating a NewClientHook which will
-// be run each time a new client program is spawned.
-struct MyClientHook {}
-impl Hook for MyClientHook {
-    fn new_client(&mut self, wm: &mut WindowManager, c: &mut Client) {
-        wm.log(&format!("new client with WM_CLASS='{}'", c.wm_class()));
-    }
-}
-
-fn get_x_resource(resource_name: &str) -> Option<String> {
-    let output = match Command::new("xgetres").arg(resource_name).output() {
-        Ok(o) => o,
-        Err(e) => return None,
-    };
-
-    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-fn parse_hex_color(color: &str) -> Option<u32> {
-    match color.len() {
-        7 => {
-            if color.chars().nth(0).unwrap() == '#' {
-                u32::from_str_radix(&color[1..], 16).ok()
-            } else {
-                None
-            }
-        }
-        6 => u32::from_str_radix(color, 16).ok(),
-        _ => None,
-    }
-}
-
-macro_rules! get_x_color {
-    ($name:expr, $fallback:expr) => {
-        parse_hex_color(&get_x_resource($name).unwrap_or($fallback.to_string()))
-            .unwrap_or_else(|| parse_hex_color($fallback).unwrap())
-    };
-}
+mod misc;
 
 fn main() {
     // penrose will log useful information about the current state of the WindowManager during
@@ -71,15 +31,6 @@ fn main() {
     // Windows with a matching WM_CLASS will always float
     config.floating_classes = &["dmenu", "dunst", "polybar", "sxiv"];
 
-    config.color_scheme = ColorScheme {
-        bg: 0x282828,   // #282828 (UNUSED)
-        fg_1: 0x3c3836, // #3c3836 (UNUSED)
-        fg_2: 0xa89984, // #a89984 (UNUSED)
-        fg_3: 0xf2e5bc, // #f2e5bc (UNUSED)
-        highlight: get_x_color!("penrose.highlight", "#CC241D"),
-        urgent: 0x458588, // #458588 (UNUSED)
-    };
-
     // When specifying a layout, most of the time you will want LayoutConf::default() as shown
     // below, which will honour gap settings and will not be run on focus changes (only when
     // clients are added/removed). To customise when/how each layout is applied you can create a
@@ -88,6 +39,7 @@ fn main() {
         floating: false,
         gapless: true,
         follow_focus: true,
+        allow_wrapping: true,
     };
 
     // Defauly number of clients in the main layout area
@@ -101,29 +53,13 @@ fn main() {
     config.layouts = vec![
         Layout::new("[side]", LayoutConf::default(), side_stack, n_main, ratio),
         Layout::new("[botm]", LayoutConf::default(), bottom_stack, n_main, ratio),
-        // Layout::new("[rcly]", LayoutConf::default(), layouts::really_cool_layout, n_main, ratio),
+        Layout::new("[mono]", follow_focus_conf, monocle, n_main, ratio),
         // Layout::new("[papr]", follow_focus_conf, paper, n_main, ratio),
         // Layout::floating("[----]"),
     ];
 
     // Gaps
     config.gap_px = 0;
-
-    /* hooks
-     *
-     * penrose provides several hook points where you can run your own code as part of
-     * WindowManager methods. This allows you to trigger custom code without having to use a key
-     * binding to do so. See the hooks module in the docs for details of what hooks are avaliable
-     * and when/how they will be called. Note that each class of hook will be called in the order
-     * that they are defined. Hooks may maintain their own internal state which they can use to
-     * modify their behaviour if desired.
-     */
-    config.hooks.push(Box::new(MyClientHook {}));
-
-    // Using a simple contrib hook that takes no config. By convention, contrib hooks have a 'new'
-    // method that returns a boxed instance of the hook with any configuration performed so that it
-    // is ready to push onto the corresponding *_hooks vec.
-    config.hooks.push(LayoutSymbolAsRootName::new());
 
     // Here we are using a contrib hook that requires configuration to set up a default workspace
     // on workspace "9". This will set the layout and spawn the supplied programs if we make
@@ -150,9 +86,6 @@ fn main() {
      * and instead spawns a new child process.
      */
     let key_bindings = gen_keybindings! {
-        // Program launch
-        "M-semicolon" => run_external!("st"), // for some reason, I need to let at least one of these
-
         // client management
         "M-j" => run_internal!(cycle_client, Forward),
         "M-k" => run_internal!(cycle_client, Backward),
