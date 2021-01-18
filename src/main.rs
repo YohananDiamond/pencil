@@ -80,7 +80,7 @@ fn main() -> penrose::Result<()> {
         Press Left + [Meta] => |wm: &mut WindowManager<_>, _: &MouseEvent| wm.cycle_workspace(Backward)
     };
 
-    let focused_border_color = xcolor!("penrose.highlight", "#883300");
+    let focused_border_color = xcolor!("pencilwm.highlight", "#883300");
 
     let config = Config::default()
         .builder()
