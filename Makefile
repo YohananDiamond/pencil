@@ -4,7 +4,7 @@ output:
 	cargo build --release
 
 install: output
-	cp ./target/release/penrose-main ~/.local/bin/penrose
+	cp ./target/release/pencil ~/.local/bin/pencil
 
 check:
 	cargo check --release

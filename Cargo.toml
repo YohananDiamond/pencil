@@ -1,5 +1,5 @@
 [package]
-name = "penrose-config"
+name = "pencil"
 version = "0.1.0"
 authors = ["YohananDiamond <mitonanan12@gmail.com>"]
 edition = "2018"
@@ -9,5 +9,5 @@ penrose = { git = "https://github.com/sminez/penrose", branch = "develop" }
 simplelog = "0.8.0"
 
 [[bin]]
-name = "penrose-main"
+name = "pencil"
 path = "src/main.rs"

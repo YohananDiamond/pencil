@@ -1,61 +1,46 @@
-#![allow(unused_imports)]
-
 #[macro_use]
 extern crate penrose;
 
-use std::collections::HashMap;
-
-use simplelog::SimpleLogger;
-
-use penrose::client::Client;
-use penrose::contrib::{
-    extensions::Scratchpad,
-    hooks::{DefaultWorkspace, LayoutSymbolAsRootName},
-    layouts::paper,
+use penrose::{
+    contrib::extensions::scratchpad::Scratchpad,
+    core::{
+        config::Config,
+        helpers::index_selectors,
+        layout::{bottom_stack, monocle, side_stack, Layout, LayoutConf},
+        ring::Selector,
+        bindings::MouseEvent,
+    },
+    logging_error_handler,
+    xcb::new_xcb_backed_window_manager,
+    Backward, Forward, Less, More,
+    WindowManager,
 };
-use penrose::hooks::Hook;
-use penrose::layout::{bottom_stack, monocle, side_stack, Layout, LayoutConf};
-use penrose::{Backward, Config, Forward, Less, More, Selector, WindowManager, XcbConnection};
-use penrose::helpers::index_selectors;
 
-mod misc;
+pub mod misc;
+
+const FOLLOW_FOCUS_CONF: LayoutConf = LayoutConf {
+    floating: false,
+    gapless: true,
+    follow_focus: true,
+    allow_wrapping: true,
+};
+
+// The default number of clients in the main layout area
+const N_MAIN: u32 = 1;
+
+// The default percentage of the screen to fill the main area of the layout
+const RATIO: f32 = 0.6;
 
 fn main() -> penrose::Result<()> {
-    SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default()).unwrap();
+    // Environment variables
+    let terminal = std::env::var("TERMINAL").unwrap_or_else(|_| "st".into());
 
-    let mut config = Config::default();
-    config.workspaces = vec!["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-    config.focused_border = xcolor!("penrose.highlight", "#883300");
+    let terminal_sp = Scratchpad::new(&terminal, 0.7, 0.7);
 
-    // Windows with a matching WM_CLASS will always float
-    config.floating_classes = &["dmenu", "dunst", "polybar", "sxiv"];
+    const WS_RANGE: std::ops::RangeInclusive<u8> = 1..=9;
+    let workspaces: Vec<_> = WS_RANGE.map(|n| format!("{}", n)).collect();
 
-    let follow_focus_conf = LayoutConf {
-        floating: false,
-        gapless: true,
-        follow_focus: true,
-        allow_wrapping: true,
-    };
-
-    let n_main = 1; // Default number of clients in the main layout area
-    let ratio = 0.6; // Default percentage of the screen to fill with the main area of the layout
-
-    // Layouts to be used on each workspace. Currently all workspaces have the same set of Layouts
-    // available to them, though they track modifications to n_main and ratio independently.
-    config.layouts = vec![
-        Layout::new("[side]", LayoutConf::default(), side_stack, n_main, ratio),
-        Layout::new("[botm]", LayoutConf::default(), bottom_stack, n_main, ratio),
-        Layout::new("[mono]", follow_focus_conf, monocle, n_main, ratio),
-        // Layout::new("[papr]", follow_focus_conf, paper, n_main, ratio),
-        // Layout::floating("[----]"),
-    ];
-
-    config.gap_px = 0;
-
-    let sp = Scratchpad::new("st", 0.8, 0.8);
-    sp.register(&mut config);
-
-    let keybindings = gen_keybindings! {
+    let key_bindings = gen_keybindings! {
         // Client management
         "M-f" => run_internal!(toggle_client_fullscreen, &Selector::Focused);
         "M-j" => run_internal!(cycle_client, Forward);
@@ -63,7 +48,7 @@ fn main() -> penrose::Result<()> {
         "M-S-j" => run_internal!(drag_client, Forward);
         "M-S-k" => run_internal!(drag_client, Backward);
         "M-q" => run_internal!(kill_client);
-        "M-s" => sp.toggle();
+        "M-s" => terminal_sp.toggle();
 
         // Workspace management
         "M-m" => run_internal!(toggle_workspace);
@@ -84,23 +69,40 @@ fn main() -> penrose::Result<()> {
 
         "M-C-S-e" => run_internal!(exit);
 
-        refmap [ config.ws_range() ] in {
-            "M-{}" => focus_workspace [ index_selectors(config.workspaces.len()) ];
-            "M-S-{}" => client_to_workspace [ index_selectors(config.workspaces.len()) ];
+        refmap [ WS_RANGE ] in {
+            "M-{}" => focus_workspace [ index_selectors(10) ];
+            "M-S-{}" => client_to_workspace [ index_selectors(10) ];
         };
     };
 
-    // Create the WindowManager instance with the config we have built and a connection to the X
-    // server. Before calling grab_keys_and_run, it is possible to run additional start-up actions
-    // such as configuring initial WindowManager state, running custom code / hooks or spawning
-    // external processes such as a start-up script.
-    let conn = XcbConnection::new().unwrap();
-    let mut wm = WindowManager::init(config, &conn);
+    let mouse_bindings = gen_mousebindings! {
+        Press Right + [Meta] => |wm: &mut WindowManager<_>, _: &MouseEvent| wm.cycle_workspace(Forward),
+        Press Left + [Meta] => |wm: &mut WindowManager<_>, _: &MouseEvent| wm.cycle_workspace(Backward)
+    };
 
-    // grab_keys_and_run will start listening to events from the X server and drop into the main
-    // event loop. From this point on, program control passes to the WindowManager so make sure
-    // that any logic you wish to run is done before here!
-    wm.grab_keys_and_run(keybindings, HashMap::new());
+    let focused_border_color = xcolor!("penrose.highlight", "#883300");
 
-    Ok(())
+    let config = Config::default()
+        .builder()
+        .floating_classes(["dmenu", "dunst", "polybar", "sxiv"].iter().cloned())
+        .workspaces(workspaces)
+        .focused_border(focused_border_color)
+        .layouts(vec![
+            Layout::new("[side]", LayoutConf::default(), side_stack, N_MAIN, RATIO),
+            Layout::new("[botm]", LayoutConf::default(), bottom_stack, N_MAIN, RATIO),
+            Layout::new("[mono]", FOLLOW_FOCUS_CONF, monocle, N_MAIN, RATIO),
+            // Layout::new("[papr]", follow_focus_conf, paper, n_main, ratio),
+            // Layout::floating("[----]"),
+        ])
+        .gap_px(0)
+        .build()
+        .expect("Failed to build config");
+
+    let mut wm = new_xcb_backed_window_manager(
+        config,
+        vec![terminal_sp.get_hook()],
+        logging_error_handler(),
+    )?;
+
+    wm.grab_keys_and_run(key_bindings, mouse_bindings)
 }
