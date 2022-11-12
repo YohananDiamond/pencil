@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 penrose = { git = "https://github.com/sminez/penrose", branch = "develop" }
+penrose_ui = { git = "https://github.com/sminez/penrose", branch = "develop" }
 simplelog = "0.8.0"
 
 [[bin]]

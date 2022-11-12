@@ -18,6 +18,8 @@ use penrose::{
 use std::convert::TryFrom;
 use std::collections::HashMap;
 
+mod bar;
+
 // TODO: pub mod misc;
 
 // The default number of clients in the main layout area
@@ -51,14 +53,18 @@ fn main() -> Result<()> {
         focused_border: Color::try_from("#000000").expect("Failed to build color"),
         // TODO: focused_border: Color::from(focused_border_color).as_rgb_hex_string()
         default_layouts: layouts,
-        focus_follow_mouse: false,
+        focus_follow_mouse: true,
         ..Config::default()
     };
 
     let conn = RustConn::new()?;
     let wm = WindowManager::new(config, key_bindings, mouse_bindings, conn)?;
 
+    let bar = bar::status_bar().unwrap();
+    let wm = bar.add_to(wm);
+
     wm.run()
+
 }
 
 fn raw_key_bindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
