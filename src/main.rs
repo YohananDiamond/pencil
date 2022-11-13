@@ -3,6 +3,7 @@ use penrose::{
         actions::{exit, modify_with, send_layout_message},
         layout::{
             messages::{ExpandMain, IncMain, ShrinkMain},
+            transformers::{ReserveTop, Gaps},
             MainAndStack, Monocle,
         },
     },
@@ -10,13 +11,14 @@ use penrose::{
         bindings::{parse_keybindings_with_xmodmap, KeyEventHandler},
         Config, WindowManager,
     },
+    extensions::hooks::add_ewmh_hooks,
     map, stack,
     x11rb::RustConn,
     Color, Result,
 };
 
-use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 mod bar;
 
@@ -42,12 +44,13 @@ fn main() -> Result<()> {
         MainAndStack::side(N_MAIN, RATIO, 0.2),
         MainAndStack::bottom(N_MAIN, RATIO, 0.2),
         Monocle::boxed()
-    );
-    // TODO: maybe: .map(|layout| ReserveTop::wrap(Gaps::wrap(layout, OUTER_PX, INNER_PX), BAR_HEIGHT_PX));
+    )
+    .map(|l| ReserveTop::wrap(l, bar::BAR_HEIGHT))
+    .map(|l| Gaps::wrap(l, 2, 2));
 
     // TODO: let focused_border_color: u32 = xcolor!("pencilwm.highlight", "#883300");
 
-    let config = Config {
+    let config = add_ewmh_hooks(Config {
         tags: WORKSPACES.iter().map(|s| s.to_string()).collect(),
         floating_classes: FLOATING_CLASSES.iter().map(|s| s.to_string()).collect(),
         focused_border: Color::try_from("#000000").expect("Failed to build color"),
@@ -55,7 +58,7 @@ fn main() -> Result<()> {
         default_layouts: layouts,
         focus_follow_mouse: true,
         ..Config::default()
-    };
+    });
 
     let conn = RustConn::new()?;
     let wm = WindowManager::new(config, key_bindings, mouse_bindings, conn)?;
@@ -64,7 +67,6 @@ fn main() -> Result<()> {
     let wm = bar.add_to(wm);
 
     wm.run()
-
 }
 
 fn raw_key_bindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {

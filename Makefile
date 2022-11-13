@@ -7,7 +7,7 @@ output: test
 	cargo build --release
 
 test:
-	cargo test
+	cargo test --release
 
 install: output
 	cp ./target/release/pencil $(DEST_DIR)/pencil
