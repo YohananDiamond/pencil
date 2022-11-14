@@ -3,7 +3,7 @@ DEST_DIR := $(USER_INSTALL_DIR)
 
 .PHONY: output install check
 
-output: test
+output:
 	cargo build --release
 
 test:

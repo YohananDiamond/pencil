@@ -1,9 +1,9 @@
 use penrose::{
     builtin::{
-        actions::{exit, modify_with, send_layout_message},
+        actions::{exit, log_current_state, modify_with, send_layout_message},
         layout::{
             messages::{ExpandMain, IncMain, ShrinkMain},
-            transformers::{ReserveTop, Gaps},
+            transformers::{Gaps, ReserveTop},
             MainAndStack, Monocle,
         },
     },
@@ -11,16 +11,23 @@ use penrose::{
         bindings::{parse_keybindings_with_xmodmap, KeyEventHandler},
         Config, WindowManager,
     },
-    extensions::hooks::add_ewmh_hooks,
+    extensions::hooks::{add_ewmh_hooks},
     map, stack,
     x11rb::RustConn,
     Color, Result,
 };
 
+use tracing_subscriber::{self, prelude::*};
+
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::env::var;
+use std::path::PathBuf;
 
 mod bar;
+
+mod startup;
+use startup::SpawnOnStartup;
 
 // TODO: pub mod misc;
 
@@ -30,23 +37,46 @@ const N_MAIN: u32 = 1;
 // The default percentage of the screen to fill the main area of the layout
 const RATIO: f32 = 0.6;
 
-// TODO: comptime
 const WORKSPACES: &[&str] = &["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 const FLOATING_CLASSES: &[&str] = &["float", "dmenu", "dunst", "polybar", "sxiv"];
 
 fn main() -> Result<()> {
+    let home = PathBuf::from(var("HOME").unwrap());
+    let config_home = match var("XDG_CONFIG_HOME") {
+        Ok(s) => PathBuf::from(s),
+        Err(_) => {
+            let mut p = home.clone();
+            p.push(".config");
+            p
+        }
+    };
+
+    let profile_dir = {
+        let mut p = config_home.clone();
+        p.push("xorg");
+        p.push("xprofile");
+        p
+    };
+
+    let tracing_builder = tracing_subscriber::fmt()
+        .json() // JSON logs
+        .flatten_event(true)
+        .with_env_filter("info")
+        .with_filter_reloading();
+    tracing_builder.finish().init();
+
     let key_bindings = parse_keybindings_with_xmodmap(raw_key_bindings())?;
     // TODO: draw windows etc.
     let mouse_bindings = HashMap::new();
 
     let layouts = stack!(
-        MainAndStack::side(N_MAIN, RATIO, 0.2),
-        MainAndStack::bottom(N_MAIN, RATIO, 0.2),
+        MainAndStack::side(N_MAIN, RATIO, 0.1),
+        MainAndStack::bottom(N_MAIN, RATIO, 0.1),
         Monocle::boxed()
     )
     .map(|l| ReserveTop::wrap(l, bar::BAR_HEIGHT))
-    .map(|l| Gaps::wrap(l, 2, 2));
+    .map(|l| Gaps::wrap(l, 1, 1));
 
     // TODO: let focused_border_color: u32 = xcolor!("pencilwm.highlight", "#883300");
 
@@ -57,6 +87,7 @@ fn main() -> Result<()> {
         // TODO: focused_border: Color::from(focused_border_color).as_rgb_hex_string()
         default_layouts: layouts,
         focus_follow_mouse: true,
+        startup_hook: Some(SpawnOnStartup::boxed(profile_dir.to_string_lossy().into_owned())),
         ..Config::default()
     });
 
@@ -69,7 +100,7 @@ fn main() -> Result<()> {
     wm.run()
 }
 
-fn raw_key_bindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
+pub fn raw_key_bindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
     let mut bindings = map! {
         map_keys: |k: &str| k.to_string();
 
@@ -95,6 +126,10 @@ fn raw_key_bindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
 
         // WM
         "M-C-S-e" => exit(),
+
+        // Debugging
+        // "M-A-t" => set_tracing_filter(handle),
+        "M-S-s" => log_current_state(),
 
         // TODO: "M-f" => run_internal!(toggle_client_fullscreen, &Selector::Focused);
         // TODO: "M-A-s" => run_internal!(detect_screens);
