@@ -11,7 +11,7 @@ use penrose::{
         bindings::{parse_keybindings_with_xmodmap, KeyEventHandler},
         Config, WindowManager,
     },
-    extensions::hooks::{add_ewmh_hooks},
+    extensions::hooks::add_ewmh_hooks,
     map, stack,
     x11rb::RustConn,
     Color, Result,
@@ -87,7 +87,9 @@ fn main() -> Result<()> {
         // TODO: focused_border: Color::from(focused_border_color).as_rgb_hex_string()
         default_layouts: layouts,
         focus_follow_mouse: true,
-        startup_hook: Some(SpawnOnStartup::boxed(profile_dir.to_string_lossy().into_owned())),
+        startup_hook: Some(SpawnOnStartup::boxed(
+            profile_dir.to_string_lossy().into_owned(),
+        )),
         ..Config::default()
     });
 

@@ -497,8 +497,8 @@ dependencies = [
 
 [[package]]
 name = "penrose"
-version = "0.3.0"
-source = "git+https://github.com/sminez/penrose?branch=develop#e7d01bd1ad9219b006c77d1043b47a9a246c55f4"
+version = "0.3.1"
+source = "git+https://github.com/sminez/penrose?branch=develop#9ae1b5c04fa138818b98145a11f92fed82fb15b0"
 dependencies = [
  "anymap",
  "bitflags",
@@ -514,7 +514,7 @@ dependencies = [
 [[package]]
 name = "penrose_keysyms"
 version = "0.1.1"
-source = "git+https://github.com/sminez/penrose?branch=develop#e7d01bd1ad9219b006c77d1043b47a9a246c55f4"
+source = "git+https://github.com/sminez/penrose?branch=develop#9ae1b5c04fa138818b98145a11f92fed82fb15b0"
 dependencies = [
  "strum",
  "strum_macros",
@@ -522,8 +522,8 @@ dependencies = [
 
 [[package]]
 name = "penrose_ui"
-version = "0.1.0"
-source = "git+https://github.com/sminez/penrose?branch=develop#e7d01bd1ad9219b006c77d1043b47a9a246c55f4"
+version = "0.1.1"
+source = "git+https://github.com/sminez/penrose?branch=develop#9ae1b5c04fa138818b98145a11f92fed82fb15b0"
 dependencies = [
  "cairo-rs",
  "pango",
